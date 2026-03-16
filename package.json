@@ -1,0 +1,43 @@
+{
+  "name": "@kud/claude-dash-cli",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "TUI dashboard for monitoring Claude Code sessions and usage",
+  "bin": {
+    "claude-dash": "dist/tui/index.js",
+    "claude-dash-daemon": "dist/daemon/index.js",
+    "claude-dash-hook": "dist/hook/index.js",
+    "claude-dash-install": "dist/install/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/tui/index.tsx",
+    "dev:daemon": "tsx src/daemon/index.ts",
+    "install:hooks": "tsx src/install/index.ts",
+    "dev:hook": "echo '{\"hook_event_name\":\"PreToolUse\",\"session_id\":\"test-123\",\"cwd\":\"/tmp\",\"permission_mode\":\"default\",\"transcript_path\":\"\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"ls -la\"}}' | tsx src/hook/index.ts",
+    "build": "tsup src/tui/index.tsx src/daemon/index.ts src/hook/index.ts src/install/index.ts --format esm --dts --no-splitting",
+    "build:watch": "tsup src/tui/index.tsx src/daemon/index.ts src/hook/index.ts src/install/index.ts --format esm --dts --no-splitting --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "ink": "^5.0.0",
+    "ink-spinner": "^5.0.0",
+    "pathe": "^1.1.2",
+    "react": "^18.2.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "tsup": "^8.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
