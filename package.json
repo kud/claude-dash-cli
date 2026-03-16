@@ -4,18 +4,19 @@
   "type": "module",
   "description": "TUI dashboard for monitoring Claude Code sessions and usage",
   "bin": {
-    "claude-dash": "dist/tui/index.js",
     "claude-dash-daemon": "dist/daemon/index.js",
     "claude-dash-hook": "dist/hook/index.js",
     "claude-dash-install": "dist/install/index.js"
   },
   "scripts": {
-    "dev": "tsx src/tui/index.tsx",
     "dev:daemon": "tsx src/daemon/index.ts",
+    "dev:tui": "echo 'Run TUI directly: cd tui-rs && cargo run'",
     "install:hooks": "tsx src/install/index.ts",
     "dev:hook": "echo '{\"hook_event_name\":\"PreToolUse\",\"session_id\":\"test-123\",\"cwd\":\"/tmp\",\"permission_mode\":\"default\",\"transcript_path\":\"\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"ls -la\"}}' | tsx src/hook/index.ts",
-    "build": "tsup src/tui/index.tsx src/daemon/index.ts src/hook/index.ts src/install/index.ts --format esm --dts --no-splitting",
-    "build:watch": "tsup src/tui/index.tsx src/daemon/index.ts src/hook/index.ts src/install/index.ts --format esm --dts --no-splitting --watch",
+    "build": "tsup src/daemon/index.ts src/hook/index.ts src/install/index.ts --format esm --dts --no-splitting",
+    "build:tui": "cd tui-rs && cargo build --release",
+    "build:all": "npm run build && npm run build:tui",
+    "build:watch": "tsup src/daemon/index.ts src/hook/index.ts src/install/index.ts --format esm --dts --no-splitting --watch",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",

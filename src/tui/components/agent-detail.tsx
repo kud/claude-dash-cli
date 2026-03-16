@@ -1,5 +1,5 @@
-import React, { memo } from "react"
-import { Box, Text } from "ink"
+import React, { memo, useMemo } from "react"
+import { Box, Text, Static } from "ink"
 import type { SessionState, ToolHistoryEntry } from "../../types.js"
 import { abbreviateHome, formatDuration } from "../utils.js"
 import {
@@ -30,12 +30,39 @@ const buildTimeline = (
     return ta - tb
   })
 
+const timelineKey = (item: TimelineItem): string =>
+  item.kind === "message"
+    ? item.message.id
+    : (item.entry.toolUseId ?? String(item.entry.startedAt))
+
+const isSettled = (item: TimelineItem): boolean =>
+  item.kind === "message" || item.entry.endedAt !== undefined
+
+const TimelineItemView = ({ item }: { item: TimelineItem }) => {
+  if (item.kind === "message") return <ChatMessage message={item.message} />
+  return (
+    <Box flexDirection="column">
+      <ToolHistoryRow entry={item.entry} />
+      {hasDiff(item.entry.toolName) && <ToolDiff entry={item.entry} />}
+    </Box>
+  )
+}
+
 type AgentDetailProps = {
   session: SessionState | null
 }
 
 export const AgentDetail = memo(({ session }: AgentDetailProps) => {
   const messages = useTranscript(session?.transcriptPath ?? null)
+
+  const timeline = useMemo(
+    () => (session ? buildTimeline(messages, session.toolHistory) : []),
+    [messages, session?.toolHistory],
+  )
+
+  const settledItems = useMemo(() => timeline.filter(isSettled), [timeline])
+
+  const activeItem = timeline.findLast((item) => !isSettled(item)) ?? null
 
   if (!session) {
     return (
@@ -46,10 +73,19 @@ export const AgentDetail = memo(({ session }: AgentDetailProps) => {
   }
 
   const elapsed = formatDuration(Date.now() - session.startedAt)
-  const timeline = buildTimeline(messages, session.toolHistory)
 
   return (
     <Box flexDirection="column" flexGrow={1}>
+      {/* Settled items — printed once to terminal scroll buffer, never re-rendered */}
+      <Static items={settledItems}>
+        {(item) => (
+          <Box key={timelineKey(item)} flexDirection="column" paddingX={1}>
+            <TimelineItemView item={item} />
+          </Box>
+        )}
+      </Static>
+
+      {/* Live section — only re-renders with active state */}
       <Box paddingX={1}>
         <Text color="cyan" bold>
           {session.sessionId.slice(0, 8)}
@@ -59,25 +95,14 @@ export const AgentDetail = memo(({ session }: AgentDetailProps) => {
         <Text dimColor> {elapsed}</Text>
       </Box>
 
-      <Box
-        flexDirection="column"
-        overflow="hidden"
-        flexGrow={1}
-        paddingX={1}
-        paddingTop={1}
-      >
-        {timeline.length === 0 && <Text dimColor>No activity yet</Text>}
-        {timeline.map((item, i) => {
-          if (item.kind === "message")
-            return <ChatMessage key={item.message.id} message={item.message} />
-
-          return (
-            <Box key={item.entry.toolUseId ?? i} flexDirection="column">
-              <ToolHistoryRow entry={item.entry} />
-              {hasDiff(item.entry.toolName) && <ToolDiff entry={item.entry} />}
-            </Box>
-          )
-        })}
+      <Box flexDirection="column" flexGrow={1} paddingX={1} paddingTop={1}>
+        {activeItem ? (
+          <TimelineItemView item={activeItem} />
+        ) : (
+          <Text dimColor>
+            {timeline.length === 0 ? "No activity yet" : "Idle"}
+          </Text>
+        )}
       </Box>
     </Box>
   )

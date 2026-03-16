@@ -138,7 +138,10 @@ export const App = () => {
           borderColor="gray"
           overflow="hidden"
         >
-          <AgentDetail session={selectedSession} />
+          <AgentDetail
+            key={selectedSession?.sessionId ?? "none"}
+            session={selectedSession}
+          />
         </Box>
       </Box>
 

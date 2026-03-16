@@ -88,9 +88,15 @@ export type DaemonMessage =
       pendingPermissions: PendingPermission[]
     }
 
-export type TuiMessage = {
-  type: "PermissionDecision"
-  connectionId: string
-  decision: "allow" | "deny"
-  reason?: string
-}
+export type TuiMessage =
+  | {
+      type: "PermissionDecision"
+      connectionId: string
+      decision: "allow" | "deny"
+      reason?: string
+    }
+  | {
+      type: "SendMessage"
+      sessionId: string
+      text: string
+    }
