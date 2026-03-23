@@ -57,6 +57,7 @@ fn render_header(frame: &mut Frame, area: Rect, app: &App) {
 
 // A slot is either a non-selectable section header or a session (by index into app.sessions).
 enum Slot {
+    Blank,
     Header { label: &'static str, color: Color },
     Session(usize),
 }
@@ -68,6 +69,9 @@ fn build_slots(sessions: &[SessionState]) -> Vec<Slot> {
     for (i, session) in sessions.iter().enumerate() {
         let priority = session.status.sort_priority();
         if Some(priority) != current_priority {
+            if current_priority.is_some() {
+                slots.push(Slot::Blank);
+            }
             let (label, color) = section_label(&session.status);
             slots.push(Slot::Header { label, color });
             current_priority = Some(priority);
@@ -80,12 +84,12 @@ fn build_slots(sessions: &[SessionState]) -> Vec<Slot> {
 
 fn section_label(status: &SessionStatus) -> (&'static str, Color) {
     match status {
-        SessionStatus::WaitingForApproval => (" waiting for approval", Color::Yellow),
+        SessionStatus::WaitingForApproval => (" waiting for approval", Color::Rgb(130, 130, 130)),
         SessionStatus::Processing | SessionStatus::RunningTool | SessionStatus::Compacting => {
-            ("󰐊 active", Color::Green)
+            ("󰐊 active", Color::Rgb(130, 130, 130))
         }
-        SessionStatus::WaitingForInput => ("󰒲 idle", Color::Gray),
-        SessionStatus::Ended => ("󰄬 ended", Color::Gray),
+        SessionStatus::WaitingForInput => ("󰒲 idle", Color::Rgb(130, 130, 130)),
+        SessionStatus::Ended => ("󰄬 ended", Color::Rgb(130, 130, 130)),
     }
 }
 
@@ -98,9 +102,11 @@ fn render_list(frame: &mut Frame, area: Rect, app: &App) {
         .position(|s| matches!(s, Slot::Session(i) if *i == selected))
         .unwrap_or(0);
 
+
     let items: Vec<ListItem> = slots
         .iter()
         .map(|slot| match slot {
+            Slot::Blank => ListItem::new(Line::raw("")),
             Slot::Header { label, color } => section_header_item(label, *color),
             Slot::Session(i) => {
                 let session = &app.sessions[*i];
@@ -124,7 +130,7 @@ fn render_list(frame: &mut Frame, area: Rect, app: &App) {
 fn section_header_item(label: &'static str, color: Color) -> ListItem<'static> {
     ListItem::new(Line::from(vec![
         Span::styled("  ", Style::default()),
-        Span::styled(label.to_uppercase(), Style::default().fg(color).add_modifier(Modifier::BOLD)),
+        Span::styled(label.to_uppercase(), Style::default().fg(color)),
     ]))
 }
 
