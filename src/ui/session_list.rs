@@ -19,12 +19,18 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     render_header(frame, header_area, app);
 
     if app.sessions.is_empty() {
-        use ratatui::text::Text;
+        let gray = Style::default().fg(Color::Rgb(100, 100, 100));
+        let dim = Style::default().fg(Color::Rgb(70, 70, 70));
+        let padding = (list_area.height / 2).saturating_sub(2);
+        let mut lines: Vec<Line> = (0..padding).map(|_| Line::raw("")).collect();
+        lines.extend([
+            Line::from(Span::styled("󰀄", Style::default().fg(Color::Rgb(80, 80, 80)))),
+            Line::raw(""),
+            Line::from(Span::styled("  Hey, I'm here whenever you're ready.", gray)),
+            Line::from(Span::styled("  Run claude in any directory to get started.", dim)),
+        ]);
         frame.render_widget(
-            Paragraph::new(Text::from(vec![Line::from(Span::styled(
-                "Waiting for Claude sessions…",
-                Style::default().fg(Color::DarkGray),
-            ))])),
+            Paragraph::new(lines),
             list_area,
         );
         return;

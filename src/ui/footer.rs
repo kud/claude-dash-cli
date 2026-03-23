@@ -47,6 +47,13 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     left_spans.extend([Span::styled("[r]", key), Span::styled(" refresh  ", dim)]);
 
     if has_sessions {
+        left_spans.extend([
+            Span::styled("[o]", key),
+            Span::styled(format!(" sort:{}  ", app.sort_mode.label()), dim),
+        ]);
+    }
+
+    if has_sessions {
         let has_ended = app.sessions.iter().any(|s| s.status == crate::types::SessionStatus::Ended);
         if has_ended {
             left_spans.extend([Span::styled("[x]", key), Span::styled(" clear ended  ", dim)]);
@@ -59,15 +66,15 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
         )])
     } else if app.connected {
-        Line::from(vec![Span::styled(
-            "● connected  ",
-            Style::default().fg(Color::DarkGray),
-        )])
+        Line::from(vec![
+            Span::styled("●", Style::default().fg(Color::Green)),
+            Span::styled(" connected  ", Style::default().fg(Color::DarkGray)),
+        ])
     } else {
-        Line::from(vec![Span::styled(
-            "⊘ disconnected  ",
-            Style::default().fg(Color::Red),
-        )])
+        Line::from(vec![
+            Span::styled("⊘", Style::default().fg(Color::Red)),
+            Span::styled(" disconnected  ", Style::default().fg(Color::DarkGray)),
+        ])
     };
 
     let [left_area, right_area] = Layout::horizontal([

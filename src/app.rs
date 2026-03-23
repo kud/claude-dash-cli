@@ -58,6 +58,28 @@ pub enum AppEvent {
     RateLimitsLoaded(RateLimits),
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum SortMode {
+    Recent,
+    Alphabetical,
+}
+
+impl SortMode {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Recent => "recent",
+            Self::Alphabetical => "a-z",
+        }
+    }
+
+    pub fn next(self) -> Self {
+        match self {
+            Self::Recent => Self::Alphabetical,
+            Self::Alphabetical => Self::Recent,
+        }
+    }
+}
+
 pub struct App {
     pub sessions: Vec<SessionState>,
     pub pending_permissions: Vec<PendingPermission>,
@@ -74,6 +96,7 @@ pub struct App {
     pub session_names: HashMap<String, String>,
     pub show_rename: bool,
     pub rename_input: String,
+    pub sort_mode: SortMode,
 
     daemon_cmd_tx: mpsc::UnboundedSender<DaemonCommand>,
     usage_refresh_tx: mpsc::UnboundedSender<()>,
@@ -108,6 +131,7 @@ impl App {
             session_names: HashMap::new(),
             show_rename: false,
             rename_input: String::new(),
+            sort_mode: SortMode::Recent,
             daemon_cmd_tx,
             usage_refresh_tx,
         }
@@ -198,7 +222,7 @@ impl App {
                 session.status = crate::types::SessionStatus::WaitingForApproval;
             }
         }
-        sessions.sort_by_key(|s| s.status.sort_priority());
+        self.sort_sessions(&mut sessions);
         self.sessions = sessions;
         self.pending_permissions = perms;
         self.selected_index = self.clamped_index();
@@ -257,6 +281,12 @@ impl App {
                 self.new_session_input.clear();
                 self.new_session_launched = false;
                 self.new_session_error = None;
+            }
+            KeyCode::Char('o') => {
+                self.sort_mode = self.sort_mode.next();
+                let mut sessions = std::mem::take(&mut self.sessions);
+                self.sort_sessions(&mut sessions);
+                self.sessions = sessions;
             }
             KeyCode::Char('r') => {
                 let _ = self.usage_refresh_tx.send(());
@@ -363,6 +393,19 @@ impl App {
         if !self.sessions.is_empty() && self.selected_index < self.sessions.len() - 1 {
             self.selected_index += 1;
             self.scroll_list_to_selected();
+        }
+    }
+
+    fn sort_sessions(&self, sessions: &mut Vec<SessionState>) {
+        match self.sort_mode {
+            SortMode::Recent => sessions.sort_by(|a, b| {
+                a.status.sort_priority().cmp(&b.status.sort_priority())
+                    .then(b.last_event_at.cmp(&a.last_event_at))
+            }),
+            SortMode::Alphabetical => sessions.sort_by(|a, b| {
+                a.status.sort_priority().cmp(&b.status.sort_priority())
+                    .then(a.cwd.cmp(&b.cwd))
+            }),
         }
     }
 
