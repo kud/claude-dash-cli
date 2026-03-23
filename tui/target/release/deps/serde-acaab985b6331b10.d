@@ -1,0 +1,14 @@
+/Users/mest001/Projects/home/claude-dash-cli/tui-rs/target/release/deps/serde-acaab985b6331b10.d: /Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/mest001/Projects/home/claude-dash-cli/tui-rs/target/release/build/serde-52ba48f4c6d16176/out/private.rs
+
+/Users/mest001/Projects/home/claude-dash-cli/tui-rs/target/release/deps/libserde-acaab985b6331b10.rlib: /Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/mest001/Projects/home/claude-dash-cli/tui-rs/target/release/build/serde-52ba48f4c6d16176/out/private.rs
+
+/Users/mest001/Projects/home/claude-dash-cli/tui-rs/target/release/deps/libserde-acaab985b6331b10.rmeta: /Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/mest001/Projects/home/claude-dash-cli/tui-rs/target/release/build/serde-52ba48f4c6d16176/out/private.rs
+
+/Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/Users/mest001/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/Users/mest001/Projects/home/claude-dash-cli/tui-rs/target/release/build/serde-52ba48f4c6d16176/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/mest001/Projects/home/claude-dash-cli/tui-rs/target/release/build/serde-52ba48f4c6d16176/out
