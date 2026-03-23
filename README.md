@@ -5,28 +5,29 @@ A fast, minimal terminal dashboard for monitoring your [Claude Code](https://cla
 Built entirely in Rust with [Ratatui](https://ratatui.rs). Zero lag, no Electron, no browser, no Node.js.
 
 ```
+◆ claude-dash  2 active  │  today $4.20 · 9.8M tok  month $52.10
 ┌──────────────────────────────────────────────────────────────────┐
-│ ◆ claude-dash  2 active  │  today $14.65 · 27.71M tok  month $334.80 │
-├──────────────────────────────────────────────────────────────────┤
-│  Agents · 2 active · 3 total                                     │
+│ Agents · 2 active · 4 total                                      │
 │                                                                  │
-│  󰐊 ACTIVE                                                        │
-│  ▶ ◆ 7b25a5bf  ~/Projects/work/mcp-archer  running  2m 52s      │
-│       mcp__archer__raw_api_call                                  │
-│                                                                  │
-│    ● 3beaf61f  ~/Projects/home/my-app  processing  45s           │
+│  ▶ ACTIVE                                                        │
+│  ▶ ◆ abc12345  ~/projects/api  running  1m 42s                   │
+│       Bash: cargo test --release                                 │
+│    ● def56789  ~/projects/web  processing  28s                   │
 │       ⠹ thinking…                                                │
 │                                                                  │
-│  󰒲 IDLE                                                          │
-│    ○ a1c3e9f2  ~/Projects/home/website  idle  1h 12m             │
+│  ~ IDLE                                                          │
+│    ○ gh901234  ~/projects/docs  idle  1h 03m                     │
 │                                                                  │
-│  ────────────────────────────────────────────────────────────    │
-│  Usage  $14.65 today                                             │
-│  Today        $14.65  ·  27.71M tok                              │
-│  This Month   $334.80  ·  639.21M tok                            │
-│  All Time     $576.41  ·  1056.68M tok   36 sessions             │
+│  ✗ ENDED                                                         │
+│    ✗ ij567890  ~/projects/old  ended  3h 22m                     │
+│                                                                  │
+│──────────────────────────────────────────────────────────────────│
+│ Usage  $4.20 today                                               │
+│ Today        $4.20  ·  9.80M tok                                 │
+│ This Month   $52.10  ·  136.20M tok                              │
+│ All Time     $248.75  ·  612.40M tok   18 sessions               │
 └──────────────────────────────────────────────────────────────────┘
-  [q] quit  [↑↓] select  [e] rename  [n] new  [r] refresh  ● connected
+[q] quit  [↑↓] select  [e] rename  [n] new  [r] refresh  ● connected
 ```
 
 ## Features
