@@ -1,7 +1,13 @@
 [package]
 name = "claude-dash"
-version = "0.1.0"
+version = "0.9.0"
 edition = "2021"
+description = "Terminal dashboard for monitoring Claude Code sessions in real time"
+repository = "https://github.com/kud/claude-dash-cli"
+license = "MIT"
+keywords = ["claude", "ai", "tui", "dashboard", "terminal"]
+categories = ["command-line-utilities", "development-tools"]
+readme = "../README.md"
 
 [[bin]]
 name = "claude-dash"

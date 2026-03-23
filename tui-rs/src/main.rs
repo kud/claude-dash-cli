@@ -1,6 +1,5 @@
 mod app;
 mod daemon;
-mod transcript;
 mod types;
 mod ui;
 mod usage;
@@ -18,7 +17,7 @@ use crossterm::terminal::{
 use futures::StreamExt;
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
-use tokio::sync::{mpsc, watch};
+use tokio::sync::mpsc;
 
 use app::{App, AppEvent};
 use daemon::DaemonCommand;
@@ -105,13 +104,11 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()
     let (app_tx, mut app_rx) = mpsc::unbounded_channel::<AppEvent>();
     let (daemon_cmd_tx, daemon_cmd_rx) = mpsc::unbounded_channel::<DaemonCommand>();
     let (usage_refresh_tx, usage_refresh_rx) = mpsc::unbounded_channel::<()>();
-    let (transcript_path_tx, transcript_path_rx) = watch::channel::<Option<String>>(None);
 
     tokio::spawn(daemon::run(app_tx.clone(), daemon_cmd_rx));
     tokio::spawn(usage::run(app_tx.clone(), usage_refresh_rx));
-    tokio::spawn(transcript::run(app_tx.clone(), transcript_path_rx));
 
-    let mut app = App::new(daemon_cmd_tx, usage_refresh_tx, transcript_path_tx);
+    let mut app = App::new(daemon_cmd_tx, usage_refresh_tx);
     let mut reader = EventStream::new();
     // Background timer: redraws every second to keep elapsed times fresh.
     // Input events and app state changes trigger immediate redraws.
@@ -134,16 +131,7 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()
                         true
                     }
                     Event::Mouse(mouse) => {
-                        let term_width = terminal.size().map(|s| s.width).unwrap_or(80);
-                        let left_panel_end = term_width * 30 / 100;
-                        let in_right_panel = mouse.column > left_panel_end;
                         match mouse.kind {
-                            MouseEventKind::ScrollUp if in_right_panel => {
-                                app.detail_scroll = app.detail_scroll.saturating_add(3);
-                            }
-                            MouseEventKind::ScrollDown if in_right_panel => {
-                                app.detail_scroll = app.detail_scroll.saturating_sub(3);
-                            }
                             MouseEventKind::ScrollUp => app.select_prev_pub(),
                             MouseEventKind::ScrollDown => app.select_next_pub(),
                             _ => {}
@@ -172,7 +160,7 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()
                 // Skip tick redraws while a modal is open — keypress events
                 // already redraw on every character, and the heavy transcript
                 // render underneath is invisible anyway.
-                let modal_open = app.show_input || app.show_rename || app.show_new_session;
+                let modal_open = app.show_rename || app.show_new_session;
                 if !modal_open {
                     terminal.draw(|f| ui::render(f, &app))?;
                 }

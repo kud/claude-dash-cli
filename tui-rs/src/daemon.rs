@@ -4,7 +4,7 @@ use tokio::net::UnixStream;
 use tokio::sync::mpsc;
 
 use crate::app::AppEvent;
-use crate::types::{DaemonMessage, TuiDecision, TuiSendMessage};
+use crate::types::{DaemonMessage, TuiDecision};
 
 const SOCKET_PATH: &str = "/tmp/claude-dash-tui.sock";
 
@@ -12,10 +12,6 @@ pub enum DaemonCommand {
     SendDecision {
         connection_id: String,
         decision: String,
-    },
-    SendMessage {
-        session_id: String,
-        text: String,
     },
 }
 
@@ -62,17 +58,6 @@ async fn connect(
                             msg_type: "PermissionDecision",
                             connection_id,
                             decision,
-                        };
-                        let line = serde_json::to_string(&msg).unwrap_or_default() + "\n";
-                        if writer.write_all(line.as_bytes()).await.is_err() {
-                            return;
-                        }
-                    }
-                    Some(DaemonCommand::SendMessage { session_id, text }) => {
-                        let msg = TuiSendMessage {
-                            msg_type: "SendMessage",
-                            session_id,
-                            text,
                         };
                         let line = serde_json::to_string(&msg).unwrap_or_default() + "\n";
                         if writer.write_all(line.as_bytes()).await.is_err() {

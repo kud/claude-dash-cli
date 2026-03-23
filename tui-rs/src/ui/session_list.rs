@@ -6,7 +6,7 @@ use ratatui::Frame;
 
 use crate::app::App;
 use crate::types::{SessionState, SessionStatus};
-use crate::utils::{abbreviate_home, format_duration, now_ms, tool_summary, trunc_mid};
+use crate::utils::{abbreviate_home, format_duration, now_ms, thinking_spinner, tool_summary, trunc_mid};
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     if area.height < 2 {
@@ -80,12 +80,12 @@ fn build_slots(sessions: &[SessionState]) -> Vec<Slot> {
 
 fn section_label(status: &SessionStatus) -> (&'static str, Color) {
     match status {
-        SessionStatus::WaitingForApproval => ("waiting for approval", Color::Yellow),
+        SessionStatus::WaitingForApproval => (" waiting for approval", Color::Yellow),
         SessionStatus::Processing | SessionStatus::RunningTool | SessionStatus::Compacting => {
-            ("active", Color::Green)
+            ("󰐊 active", Color::Green)
         }
-        SessionStatus::WaitingForInput => ("idle", Color::DarkGray),
-        SessionStatus::Ended => ("ended", Color::DarkGray),
+        SessionStatus::WaitingForInput => ("󰒲 idle", Color::Gray),
+        SessionStatus::Ended => ("󰄬 ended", Color::Gray),
     }
 }
 
@@ -109,7 +109,7 @@ fn render_list(frame: &mut Frame, area: Rect, app: &App) {
                     .iter()
                     .any(|p| p.session_id == session.session_id);
                 let display_name = app.session_display_name(&session.session_id).to_string();
-                session_item(session, *i == selected, has_pending, display_name)
+                session_item(session, *i == selected, has_pending, display_name, app.tick_count, area.width as usize)
             }
         })
         .collect();
@@ -124,7 +124,7 @@ fn render_list(frame: &mut Frame, area: Rect, app: &App) {
 fn section_header_item(label: &'static str, color: Color) -> ListItem<'static> {
     ListItem::new(Line::from(vec![
         Span::styled("  ", Style::default()),
-        Span::styled(label.to_uppercase(), Style::default().fg(color).add_modifier(Modifier::BOLD).add_modifier(Modifier::DIM)),
+        Span::styled(label.to_uppercase(), Style::default().fg(color).add_modifier(Modifier::BOLD)),
     ]))
 }
 
@@ -142,9 +142,12 @@ fn compute_offset(current_offset: usize, selected: usize, total: usize, visible:
     offset.min(total.saturating_sub(visible))
 }
 
-fn session_item(session: &SessionState, selected: bool, has_pending_permission: bool, display_name: String) -> ListItem<'_> {
+fn session_item(session: &SessionState, selected: bool, has_pending_permission: bool, display_name: String, tick: u64, area_width: usize) -> ListItem<'_> {
     let elapsed = format_duration(now_ms() - session.started_at);
-    let cwd = trunc_mid(&abbreviate_home(&session.cwd), 36);
+    // Reserve space for cursor(2) + icon(2) + name(8) + spaces + status(12) + elapsed(8)
+    let cwd_max = area_width.saturating_sub(display_name.len() + 36).max(20);
+    let label_max = area_width.saturating_sub(5).max(20);
+    let cwd = trunc_mid(&abbreviate_home(&session.cwd), cwd_max);
     let status_color = session.status.color();
 
     let cursor = if selected {
@@ -185,7 +188,7 @@ fn session_item(session: &SessionState, selected: bool, has_pending_permission: 
                     .as_ref()
                     .cloned()
                     .unwrap_or(serde_json::Value::Object(Default::default()));
-                (trunc_mid(&tool_summary(t, &input), 46), Color::Yellow)
+                (trunc_mid(&tool_summary(t, &input), label_max), Color::Yellow)
             })
         }
         SessionStatus::WaitingForApproval => {
@@ -194,20 +197,17 @@ fn session_item(session: &SessionState, selected: bool, has_pending_permission: 
                 .as_deref()
                 .map(|t| format!("permission needed: {}", t))
                 .unwrap_or_else(|| "permission needed".to_string());
-            Some((trunc_mid(&label, 46), Color::Yellow))
+            Some((trunc_mid(&label, label_max), Color::Yellow))
         }
         SessionStatus::Processing | SessionStatus::Compacting => {
-            Some(("thinking…".to_string(), Color::DarkGray))
+            Some((format!("{} thinking…", thinking_spinner(tick)), Color::DarkGray))
         }
         SessionStatus::WaitingForInput => {
-            session.last_notification.as_deref().and_then(|n| {
+            let notification = session.last_notification.as_deref().and_then(|n| {
                 let is_permission_msg = n.to_lowercase().contains("permission");
-                if is_permission_msg && !has_pending_permission {
-                    None
-                } else {
-                    Some((trunc_mid(n, 46), Color::DarkGray))
-                }
-            })
+                if is_permission_msg && !has_pending_permission { None } else { Some(n) }
+            });
+            notification.map(|n| (trunc_mid(n, label_max), Color::DarkGray))
         }
         SessionStatus::Ended => Some(("session ended".to_string(), Color::DarkGray)),
     };

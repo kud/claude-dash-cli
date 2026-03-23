@@ -138,25 +138,16 @@ pub struct TuiDecision {
     pub decision: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct TuiSendMessage {
-    #[serde(rename = "type")]
-    pub msg_type: &'static str,
-    #[serde(rename = "sessionId")]
-    pub session_id: String,
-    pub text: String,
-}
-
 // ── Usage types ────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ModelBreakdown {
     pub model_name: String,
     pub total_tokens: i64,
     pub total_cost: f64,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DailyUsage {
     pub cost: f64,
     pub total_tokens: i64,
@@ -167,7 +158,7 @@ pub struct DailyUsage {
     pub date: String,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MonthlyUsage {
     pub month: String,
     pub total_cost: f64,
@@ -179,7 +170,7 @@ pub struct MonthlyUsage {
     pub model_breakdowns: Vec<ModelBreakdown>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TotalUsage {
     pub total_cost: f64,
     pub total_tokens: i64,
@@ -218,18 +209,3 @@ pub struct UsageData {
     pub last_fetched: Option<std::time::Instant>,
 }
 
-// ── Transcript types ───────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum MessageRole {
-    User,
-    Assistant,
-}
-
-#[derive(Debug, Clone)]
-pub struct TranscriptMessage {
-    pub id: String,
-    pub role: MessageRole,
-    pub text: String,
-    pub timestamp: i64,
-}

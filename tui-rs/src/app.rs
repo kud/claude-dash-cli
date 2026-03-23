@@ -1,13 +1,47 @@
 use crossterm::event::KeyCode;
-use tokio::sync::{mpsc, watch};
+use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
 
 use crate::daemon::DaemonCommand;
 use std::collections::{HashMap, HashSet};
 
 use crate::types::{
     DailyUsage, DaemonMessage, MonthlyUsage, PendingPermission, RateLimits, SessionState,
-    TotalUsage, TranscriptMessage, UsageData,
+    TotalUsage, UsageData,
 };
+
+#[derive(Serialize, Deserialize)]
+struct UsageCache {
+    today: Option<DailyUsage>,
+    yesterday: Option<DailyUsage>,
+    monthly: Option<MonthlyUsage>,
+    total: Option<TotalUsage>,
+    daily_history: Vec<DailyUsage>,
+}
+
+fn cache_path() -> Option<std::path::PathBuf> {
+    std::env::var("HOME").ok().map(|h| std::path::PathBuf::from(h).join(".claude-dash-usage.json"))
+}
+
+fn load_usage_cache() -> Option<UsageCache> {
+    let path = cache_path()?;
+    let bytes = std::fs::read(&path).ok()?;
+    serde_json::from_slice(&bytes).ok()
+}
+
+fn save_usage_cache(usage: &UsageData) {
+    let Some(path) = cache_path() else { return };
+    let cache = UsageCache {
+        today: usage.today.clone(),
+        yesterday: usage.yesterday.clone(),
+        monthly: usage.monthly.clone(),
+        total: usage.total.clone(),
+        daily_history: usage.daily_history.clone(),
+    };
+    if let Ok(json) = serde_json::to_vec(&cache) {
+        let _ = std::fs::write(path, json);
+    }
+}
 
 pub enum AppEvent {
     DaemonConnected,
@@ -22,7 +56,6 @@ pub enum AppEvent {
         daily_history: Vec<DailyUsage>,
     },
     RateLimitsLoaded(RateLimits),
-    TranscriptLoaded(Vec<TranscriptMessage>),
 }
 
 pub struct App {
@@ -31,15 +64,11 @@ pub struct App {
     pub connected: bool,
     pub selected_index: usize,
     pub list_offset: usize,
-    pub detail_scroll: usize,
     pub usage: UsageData,
-    pub transcript: Vec<TranscriptMessage>,
     pub show_new_session: bool,
     pub new_session_input: String,
     pub new_session_launched: bool,
     pub new_session_error: Option<String>,
-    pub show_input: bool,
-    pub input_text: String,
     pub tick_count: u64,
     pub session_allowed_tools: HashMap<String, HashSet<String>>,
     pub session_names: HashMap<String, String>,
@@ -48,31 +77,32 @@ pub struct App {
 
     daemon_cmd_tx: mpsc::UnboundedSender<DaemonCommand>,
     usage_refresh_tx: mpsc::UnboundedSender<()>,
-    transcript_path_tx: watch::Sender<Option<String>>,
-    last_transcript_session: Option<String>,
 }
 
 impl App {
     pub fn new(
         daemon_cmd_tx: mpsc::UnboundedSender<DaemonCommand>,
         usage_refresh_tx: mpsc::UnboundedSender<()>,
-        transcript_path_tx: watch::Sender<Option<String>>,
     ) -> Self {
+        let mut usage = UsageData::default();
+        if let Some(cache) = load_usage_cache() {
+            usage.today = cache.today;
+            usage.yesterday = cache.yesterday;
+            usage.monthly = cache.monthly;
+            usage.total = cache.total;
+            usage.daily_history = cache.daily_history;
+        }
         Self {
             sessions: vec![],
             pending_permissions: vec![],
             connected: false,
             selected_index: 0,
             list_offset: 0,
-            detail_scroll: 0,
-            usage: UsageData::default(),
-            transcript: vec![],
+            usage,
             show_new_session: false,
             new_session_input: String::new(),
             new_session_launched: false,
             new_session_error: None,
-            show_input: false,
-            input_text: String::new(),
             tick_count: 0,
             session_allowed_tools: HashMap::new(),
             session_names: HashMap::new(),
@@ -80,8 +110,6 @@ impl App {
             rename_input: String::new(),
             daemon_cmd_tx,
             usage_refresh_tx,
-            transcript_path_tx,
-            last_transcript_session: None,
         }
     }
 
@@ -131,13 +159,11 @@ impl App {
                 self.usage.daily_history = daily_history;
                 self.usage.error = None;
                 self.usage.last_fetched = Some(std::time::Instant::now());
+                save_usage_cache(&self.usage);
             }
             AppEvent::RateLimitsLoaded(limits) => {
                 self.usage.limits = Some(limits);
                 self.usage.limits_loading = false;
-            }
-            AppEvent::TranscriptLoaded(messages) => {
-                self.transcript = messages;
             }
         }
     }
@@ -176,28 +202,12 @@ impl App {
         self.sessions = sessions;
         self.pending_permissions = perms;
         self.selected_index = self.clamped_index();
-        self.sync_transcript_path();
-    }
-
-    fn sync_transcript_path(&mut self) {
-        let path = self.selected_session().map(|s| s.transcript_path.clone());
-        let session_id = self.selected_session().map(|s| s.session_id.clone());
-
-        if session_id != self.last_transcript_session {
-            self.last_transcript_session = session_id;
-            self.transcript.clear();
-            self.detail_scroll = 0;
-            let _ = self.transcript_path_tx.send(path);
-        }
     }
 
     // Returns true if the app should quit.
     pub fn handle_key(&mut self, code: KeyCode, modifiers: crossterm::event::KeyModifiers) -> bool {
         if self.show_new_session {
             return self.handle_key_new_session(code, modifiers);
-        }
-        if self.show_input {
-            return self.handle_key_input(code);
         }
         if self.show_rename {
             return self.handle_key_rename(code);
@@ -242,21 +252,6 @@ impl App {
                     self.show_rename = true;
                 }
             }
-            KeyCode::Char('i') => {
-                if self.selected_session().is_some() {
-                    self.show_input = true;
-                    self.input_text.clear();
-                }
-            }
-            KeyCode::Enter => {
-                let is_waiting = self.selected_session()
-                    .map(|s| s.status == crate::types::SessionStatus::WaitingForInput)
-                    .unwrap_or(false);
-                if is_waiting {
-                    self.show_input = true;
-                    self.input_text.clear();
-                }
-            }
             KeyCode::Char('n') => {
                 self.show_new_session = true;
                 self.new_session_input.clear();
@@ -266,11 +261,17 @@ impl App {
             KeyCode::Char('r') => {
                 let _ = self.usage_refresh_tx.send(());
             }
-            KeyCode::PageUp => {
-                self.detail_scroll = self.detail_scroll.saturating_add(20);
-            }
-            KeyCode::PageDown => {
-                self.detail_scroll = self.detail_scroll.saturating_sub(20);
+            KeyCode::Char('x') => {
+                let selected_id = self.selected_session().map(|s| s.session_id.clone());
+                self.sessions.retain(|s| s.status != crate::types::SessionStatus::Ended);
+                // Reselect the previously selected session if it still exists.
+                if let Some(id) = selected_id {
+                    if let Some(pos) = self.sessions.iter().position(|s| s.session_id == id) {
+                        self.selected_index = pos;
+                    } else {
+                        self.selected_index = self.clamped_index();
+                    }
+                }
             }
             _ => {}
         }
@@ -340,32 +341,6 @@ impl App {
         false
     }
 
-    fn handle_key_input(&mut self, code: KeyCode) -> bool {
-        match code {
-            KeyCode::Esc => {
-                self.show_input = false;
-            }
-            KeyCode::Enter => {
-                let text = self.input_text.trim().to_string();
-                if !text.is_empty() {
-                    if let Some(session) = self.selected_session() {
-                        let session_id = session.session_id.clone();
-                        let _ = self.daemon_cmd_tx.send(DaemonCommand::SendMessage { session_id, text });
-                    }
-                }
-                self.show_input = false;
-            }
-            KeyCode::Backspace => {
-                self.input_text.pop();
-            }
-            KeyCode::Char(c) => {
-                self.input_text.push(c);
-            }
-            _ => {}
-        }
-        false
-    }
-
     pub fn tick(&mut self) {
         self.tick_count = self.tick_count.wrapping_add(1);
         if self.new_session_launched {
@@ -380,8 +355,6 @@ impl App {
     fn select_prev(&mut self) {
         if self.selected_index > 0 {
             self.selected_index -= 1;
-            self.detail_scroll = 0;
-            self.sync_transcript_path();
             self.scroll_list_to_selected();
         }
     }
@@ -389,8 +362,6 @@ impl App {
     fn select_next(&mut self) {
         if !self.sessions.is_empty() && self.selected_index < self.sessions.len() - 1 {
             self.selected_index += 1;
-            self.detail_scroll = 0;
-            self.sync_transcript_path();
             self.scroll_list_to_selected();
         }
     }

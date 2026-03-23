@@ -5,7 +5,6 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use crate::app::App;
-use crate::types::SessionStatus;
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let has_pending = !app.pending_permissions.is_empty();
@@ -36,19 +35,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         ]);
     }
 
-    if has_sessions && !app.show_input {
-        let selected_waiting = app.selected_session()
-            .map(|s| s.status == SessionStatus::WaitingForInput)
-            .unwrap_or(false);
-        if selected_waiting {
-            left_spans.extend([
-                Span::styled("[i]", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-                Span::styled(" reply  ", Style::default().fg(Color::Yellow)),
-            ]);
-        } else {
-            left_spans.extend([Span::styled("[i]", key), Span::styled(" send  ", dim)]);
-        }
-    }
+
     if has_sessions && !app.show_rename {
         left_spans.extend([Span::styled("[e]", key), Span::styled(" rename  ", dim)]);
     }
@@ -57,10 +44,13 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         left_spans.extend([Span::styled("[n]", key), Span::styled(" new  ", dim)]);
     }
 
-    left_spans.extend([Span::styled("[r]", key), Span::styled(" refresh", dim)]);
+    left_spans.extend([Span::styled("[r]", key), Span::styled(" refresh  ", dim)]);
 
     if has_sessions {
-        left_spans.push(Span::styled("  scroll↕", dim));
+        let has_ended = app.sessions.iter().any(|s| s.status == crate::types::SessionStatus::Ended);
+        if has_ended {
+            left_spans.extend([Span::styled("[x]", key), Span::styled(" clear ended  ", dim)]);
+        }
     }
 
     let right_text = if has_pending {

@@ -199,7 +199,7 @@ fn push_rate_row(lines: &mut Vec<Line<'static>>, label: &str, utilization: f64, 
 
 fn push_divider(lines: &mut Vec<Line<'static>>, width: usize) {
     lines.push(Line::from(Span::styled(
-        "─".repeat(width.min(60)),
+        "─".repeat(width),
         Style::default().fg(Color::DarkGray),
     )));
 }

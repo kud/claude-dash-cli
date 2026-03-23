@@ -317,43 +317,6 @@ pub fn render_rename(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(Paragraph::new(Text::from(lines)), inner);
 }
 
-pub fn render_input(frame: &mut Frame, area: Rect, app: &App) {
-    let Some(session) = app.selected_session() else { return };
-    let popup = centered_rect(area, 64, 7);
-    frame.render_widget(Clear, popup);
-
-    let short_id = &session.session_id[..8.min(session.session_id.len())];
-    let title = format!(" ◆ Send to {} ", short_id);
-
-    let block = Block::bordered()
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Cyan))
-        .title(Line::from(Span::styled(
-            title,
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-        )));
-
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
-
-    let input_display = format!("{}▌", app.input_text);
-    let lines = vec![
-        Line::raw(""),
-        Line::from(vec![
-            Span::raw(" "),
-            Span::styled(input_display, Style::default().fg(Color::White)),
-        ]),
-        Line::raw(""),
-        Line::raw(""),
-        Line::from(Span::styled(
-            "[enter] send   [esc] cancel",
-            Style::default().fg(Color::DarkGray),
-        )),
-    ];
-
-    frame.render_widget(Paragraph::new(Text::from(lines)), inner);
-}
-
 // Centers the popup within the right 70% panel.
 fn right_panel_rect(area: Rect, height: u16) -> Rect {
     let panel_x = area.width * 30 / 100;
