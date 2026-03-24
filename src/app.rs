@@ -303,6 +303,13 @@ impl App {
                     }
                 }
             }
+            KeyCode::Delete | KeyCode::Backspace => {
+                if let Some(session) = self.selected_session() {
+                    let id = session.session_id.clone();
+                    self.sessions.retain(|s| s.session_id != id);
+                    self.selected_index = self.clamped_index();
+                }
+            }
             _ => {}
         }
         false
