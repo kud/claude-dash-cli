@@ -54,6 +54,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     }
 
     if has_sessions {
+        left_spans.extend([Span::styled("[⌫]", key), Span::styled(" remove  ", dim)]);
         let has_ended = app.sessions.iter().any(|s| s.status == crate::types::SessionStatus::Ended);
         if has_ended {
             left_spans.extend([Span::styled("[x]", key), Span::styled(" clear ended  ", dim)]);

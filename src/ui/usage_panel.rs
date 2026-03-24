@@ -40,7 +40,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         push_divider(&mut lines, width);
         lines.push(Line::from(Span::styled(
             "Model Breakdown",
-            Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD),
+            Style::default().fg(Color::Rgb(130, 130, 130)),
         )));
         let max_tokens = models.iter().map(|m| m.total_tokens).max().unwrap_or(1);
         let mut sorted = models.to_vec();
@@ -99,7 +99,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         push_divider(&mut lines, width);
         lines.push(Line::from(Span::styled(
             "Cache",
-            Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD),
+            Style::default().fg(Color::Rgb(130, 130, 130)),
         )));
         lines.push(Line::from(vec![
             Span::styled("created ", Style::default().fg(Color::DarkGray)),
@@ -246,14 +246,15 @@ fn push_stat_row(
     delta: Option<&str>,
     extra: Option<String>,
 ) {
+    let label_color = Color::Rgb(160, 160, 160);
     let mut spans = vec![
-        Span::styled(format!("{:<14}", label), Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("{:<14}", label), Style::default().fg(label_color)),
         Span::styled(
             fmt_cost(cost),
             Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
         ),
         Span::styled(" · ", Style::default().fg(Color::DarkGray)),
-        Span::raw(fmt_tokens(tokens)),
+        Span::styled(fmt_tokens(tokens), Style::default().fg(label_color)),
     ];
     if let Some(d) = delta {
         let color = if d.starts_with('+') { Color::Red } else { Color::Green };
@@ -293,14 +294,17 @@ fn push_daily_chart(lines: &mut Vec<Line<'static>>, app: &App) {
         let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty));
         let day_label = day_abbrev_from_iso(&day.date);
         let cost_str = fmt_cost(day.cost);
-        let marker = if i == last_idx { " ←" } else { "" };
+        let is_today = i == last_idx;
+        let marker = if is_today { " ←" } else { "" };
+        let day_color = if is_today { Color::White } else { Color::Rgb(150, 150, 150) };
+        let bar_color = if is_today { Color::Cyan } else { Color::Rgb(80, 120, 160) };
         lines.push(Line::from(vec![
-            Span::styled(format!("{:<4}", day_label), Style::default().fg(Color::DarkGray)),
-            Span::styled(bar, Style::default().fg(Color::Cyan)),
+            Span::styled(format!("{:<4}", day_label), Style::default().fg(day_color)),
+            Span::styled(bar, Style::default().fg(bar_color)),
             Span::raw("  "),
             Span::styled(
                 format!("{:>7}{}", cost_str, marker),
-                Style::default().fg(Color::White),
+                Style::default().fg(if is_today { Color::White } else { Color::Rgb(180, 180, 180) }),
             ),
         ]));
     }
@@ -322,7 +326,7 @@ fn date_to_dow(year: i64, month: i64, day: i64) -> usize {
     let k = y % 100;
     let j = y / 100;
     let h = (day + (13 * (m + 1)) / 5 + k + k / 4 + j / 4 - 2 * j).rem_euclid(7);
-    ((h + 5) % 7) as usize
+    ((h + 6) % 7) as usize
 }
 
 fn push_token_breakdown(lines: &mut Vec<Line<'static>>, app: &App) {
@@ -343,10 +347,10 @@ fn push_token_breakdown(lines: &mut Vec<Line<'static>>, app: &App) {
         let empty = bar_width.saturating_sub(filled);
         let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty));
         lines.push(Line::from(vec![
-            Span::styled(format!("{:<14}", label), Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{:<14}", label), Style::default().fg(Color::Rgb(160, 160, 160))),
             Span::styled(bar, Style::default().fg(color)),
             Span::raw("  "),
-            Span::styled(fmt_tokens(tokens), Style::default().fg(Color::White)),
+            Span::styled(fmt_tokens(tokens), Style::default().fg(Color::Rgb(200, 200, 200))),
             Span::styled(
                 format!("  {:>3}%", pct.round() as u32),
                 Style::default().fg(Color::DarkGray),
@@ -354,10 +358,10 @@ fn push_token_breakdown(lines: &mut Vec<Line<'static>>, app: &App) {
         ]));
     };
 
-    push_token_row(lines, "Input", today.input_tokens, Color::Blue);
-    push_token_row(lines, "Output", today.output_tokens, Color::Green);
-    push_token_row(lines, "Cache Write", today.cache_creation_tokens, Color::Yellow);
-    push_token_row(lines, "Cache Read", today.cache_read_tokens, Color::Cyan);
+    push_token_row(lines, "Input", today.input_tokens, Color::Rgb(80, 130, 200));
+    push_token_row(lines, "Output", today.output_tokens, Color::Rgb(80, 180, 100));
+    push_token_row(lines, "Cache Write", today.cache_creation_tokens, Color::Rgb(200, 150, 50));
+    push_token_row(lines, "Cache Read", today.cache_read_tokens, Color::Rgb(80, 180, 180));
 }
 
 fn truncate_model_date(name: &str) -> String {

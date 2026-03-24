@@ -1,6 +1,7 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
+use ratatui::layout::Alignment;
 use ratatui::widgets::{List, ListItem, Paragraph};
 use ratatui::Frame;
 
@@ -26,11 +27,11 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         lines.extend([
             Line::from(Span::styled("󰀄", Style::default().fg(Color::Rgb(80, 80, 80)))),
             Line::raw(""),
-            Line::from(Span::styled("  Hey, I'm here whenever you're ready.", gray)),
-            Line::from(Span::styled("  Run claude in any directory to get started.", dim)),
+            Line::from(Span::styled("Hey, I'm here whenever you're ready.", gray)),
+            Line::from(Span::styled("Run claude in any directory to get started.", dim)),
         ]);
         frame.render_widget(
-            Paragraph::new(lines),
+            Paragraph::new(lines).alignment(Alignment::Center),
             list_area,
         );
         return;
@@ -113,7 +114,7 @@ fn render_list(frame: &mut Frame, area: Rect, app: &App) {
         .iter()
         .map(|slot| match slot {
             Slot::Blank => ListItem::new(Line::raw("")),
-            Slot::Header { label, color } => section_header_item(label, *color),
+            Slot::Header { label, color } => section_header_item(label, *color, area.width as usize),
             Slot::Session(i) => {
                 let session = &app.sessions[*i];
                 let has_pending = app
@@ -133,10 +134,18 @@ fn render_list(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(List::new(visible), area);
 }
 
-fn section_header_item(label: &'static str, color: Color) -> ListItem<'static> {
+fn section_header_item(label: &'static str, color: Color, width: usize) -> ListItem<'static> {
+    let label_upper = label.to_uppercase();
+    // "── LABEL ──────" — prefix dashes + label + trailing dashes to fill width
+    let prefix = "── ";
+    let suffix = " ";
+    let label_display_len = label_upper.chars().count();
+    let used = prefix.chars().count() + label_display_len + suffix.chars().count();
+    let trailing = "─".repeat(width.saturating_sub(used));
     ListItem::new(Line::from(vec![
-        Span::styled("  ", Style::default()),
-        Span::styled(label.to_uppercase(), Style::default().fg(color)),
+        Span::styled(prefix, Style::default().fg(color)),
+        Span::styled(label_upper, Style::default().fg(color)),
+        Span::styled(format!("{}{}", suffix, trailing), Style::default().fg(color)),
     ]))
 }
 
@@ -163,20 +172,20 @@ fn session_item(session: &SessionState, selected: bool, has_pending_permission: 
     let status_color = session.status.color();
 
     let cursor = if selected {
-        Span::styled("▶ ", Style::default().fg(Color::Cyan))
+        Span::styled("❯ ", Style::default().fg(Color::Cyan))
     } else {
         Span::raw("  ")
     };
 
     let id_style = if selected {
-        Style::default().add_modifier(Modifier::BOLD)
+        Style::default().fg(Color::Rgb(220, 190, 100)).add_modifier(Modifier::BOLD)
     } else {
-        Style::default()
+        Style::default().fg(Color::Rgb(160, 140, 70))
     };
     let cwd_style = if selected {
         Style::default().fg(Color::White)
     } else {
-        Style::default().fg(Color::Gray)
+        Style::default().fg(Color::Rgb(180, 180, 180))
     };
 
     let mut lines = vec![Line::from(vec![
@@ -224,15 +233,17 @@ fn session_item(session: &SessionState, selected: bool, has_pending_permission: 
         SessionStatus::Ended => Some(("session ended".to_string(), Color::DarkGray)),
     };
 
-    let second_line = if let Some((label, color)) = tool_label {
-        Line::from(vec![
+    if let Some((label, color)) = tool_label {
+        lines.push(Line::from(vec![
             Span::raw("     "),
             Span::styled(label, Style::default().fg(color)),
-        ])
-    } else {
-        Line::raw("")
-    };
-    lines.push(second_line);
+        ]));
+    }
 
-    ListItem::new(lines)
+    let item = ListItem::new(lines);
+    if selected {
+        item.style(Style::default().bg(Color::Rgb(30, 35, 50)))
+    } else {
+        item
+    }
 }

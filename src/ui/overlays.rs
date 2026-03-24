@@ -14,8 +14,9 @@ pub fn render_permission(frame: &mut Frame, area: Rect, app: &App) {
 
     let cwd = abbreviate_home(&perm.cwd);
     let body_lines = build_permission_body(perm);
+    // +2 borders, +3 header rows (session/tool/blank), +1 buttons, +1 breathing room
     let content_height = body_lines.len() as u16;
-    let popup = right_panel_rect(area, content_height + 7);
+    let popup = right_panel_rect(area, content_height + 8);
 
     frame.render_widget(Clear, popup);
 
@@ -50,7 +51,7 @@ pub fn render_permission(frame: &mut Frame, area: Rect, app: &App) {
         Line::from(vec![
             Span::styled("tool    ", Style::default().fg(Color::DarkGray)),
             Span::styled(
-                perm.tool_name.clone(),
+                format_tool_name(&perm.tool_name),
                 Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
             ),
         ]),
@@ -73,6 +74,16 @@ pub fn render_permission(frame: &mut Frame, area: Rect, app: &App) {
         ])),
         buttons_area,
     );
+}
+
+fn format_tool_name(name: &str) -> String {
+    // mcp__namespace__tool_name → namespace › tool_name
+    if let Some(rest) = name.strip_prefix("mcp__") {
+        if let Some((ns, tool)) = rest.split_once("__") {
+            return format!("{} › {}", ns, tool);
+        }
+    }
+    name.to_string()
 }
 
 fn build_permission_body(perm: &crate::types::PendingPermission) -> Vec<Line<'static>> {
@@ -180,7 +191,7 @@ fn build_bash_body(input: &serde_json::Value) -> Vec<Line<'static>> {
 
 fn build_json_body(input: &serde_json::Value) -> Vec<Line<'static>> {
     let json = serde_json::to_string_pretty(input).unwrap_or_default();
-    let mut lines = vec![Line::raw("")];
+    let mut lines = Vec::new();
     for l in json.lines().take(20) {
         lines.push(Line::from(Span::styled(
             l.to_string(),
