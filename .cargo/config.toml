@@ -1,0 +1,19 @@
+[alias]
+# Run the TUI (default entry point)
+dev    = "run"
+
+# Run just the daemon in the foreground
+daemon = "run -- daemon"
+
+# Install hooks into ~/.claude/settings.json
+setup  = "run -- install"
+
+# Lint
+lint   = "clippy -- -D warnings"
+
+# Build optimised release binary
+dist    = "build --release"
+
+# Release: bump version, commit, tag, publish, push
+# Usage: cargo release [patch|minor|major]  (default: patch)
+release = "run --manifest-path xtask/Cargo.toml --"
