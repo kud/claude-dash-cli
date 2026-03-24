@@ -97,11 +97,6 @@ pub async fn run() -> Result<()> {
     let Some(session_id) = raw.session_id else { return Ok(()) };
     let Some(hook_event_name) = raw.hook_event_name else { return Ok(()) };
 
-    // Bail if daemon is not running
-    if UnixStream::connect(SOCKET_PATH).await.is_err() {
-        return Ok(());
-    }
-
     let ppid = unsafe { libc::getppid() } as u32;
     let cwd = if raw.cwd.is_empty() {
         std::env::current_dir()

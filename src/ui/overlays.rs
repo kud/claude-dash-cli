@@ -16,7 +16,7 @@ pub fn render_permission(frame: &mut Frame, area: Rect, app: &App) {
     let body_lines = build_permission_body(perm);
     // +2 borders, +3 header rows (session/tool/blank), +1 buttons, +1 breathing room
     let content_height = body_lines.len() as u16;
-    let popup = right_panel_rect(area, content_height + 8);
+    let popup = centered_rect(area, area.width * 80 / 100, content_height + 8);
 
     frame.render_widget(Clear, popup);
 
@@ -326,17 +326,6 @@ pub fn render_rename(frame: &mut Frame, area: Rect, app: &App) {
     ];
 
     frame.render_widget(Paragraph::new(Text::from(lines)), inner);
-}
-
-// Centers the popup within the right 70% panel.
-fn right_panel_rect(area: Rect, height: u16) -> Rect {
-    let panel_x = area.width * 30 / 100;
-    let panel_w = area.width.saturating_sub(panel_x);
-    let w = (panel_w * 85 / 100).min(panel_w.saturating_sub(4));
-    let h = height.min(area.height.saturating_sub(4));
-    let x = panel_x + (panel_w.saturating_sub(w)) / 2;
-    let y = area.y + (area.height.saturating_sub(h)) / 2;
-    Rect::new(x, y, w, h)
 }
 
 fn centered_rect(area: Rect, width: u16, height: u16) -> Rect {

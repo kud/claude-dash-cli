@@ -1,8 +1,18 @@
 use anyhow::Result;
 
 const SETTINGS_RELATIVE: &str = ".claude/settings.json";
-const HOOK_EVENTS: &[&str] =
-    &["PreToolUse", "PostToolUse", "Stop", "Notification", "PermissionRequest", "PreCompact"];
+const HOOK_EVENTS: &[&str] = &[
+    "SessionStart",
+    "SessionEnd",
+    "UserPromptSubmit",
+    "PreToolUse",
+    "PostToolUse",
+    "Stop",
+    "Notification",
+    "PermissionRequest",
+    "PreCompact",
+    "SubagentStop",
+];
 
 pub fn run() -> Result<()> {
     let home = std::env::var("HOME").unwrap_or_default();

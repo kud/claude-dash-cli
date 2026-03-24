@@ -224,6 +224,8 @@ fn apply_event(state: &mut DaemonState, event: &HookEventRaw) {
         "UserPromptSubmit" => {
             let mut s = get_or_create(state, event);
             s.status = SessionStatus::Processing;
+            s.current_tool = None;
+            s.current_tool_input = None;
             s.last_event_at = ts;
             upsert(state, s);
         }
@@ -244,6 +246,9 @@ fn apply_event(state: &mut DaemonState, event: &HookEventRaw) {
             s.current_tool_use_id = event.tool_use_id.clone();
             s.last_event_at = ts;
             s.tool_history.push(entry);
+            if s.tool_history.len() > 50 {
+                s.tool_history.remove(0);
+            }
             upsert(state, s);
         }
         "PostToolUse" => {
@@ -346,13 +351,20 @@ fn serialize_state(state: &DaemonState, msg_type: &'static str) -> String {
 async fn serve_hook(state: SharedState, pending: PendingMap, change_tx: ChangeTx) -> Result<()> {
     let listener = UnixListener::bind(HOOK_SOCKET_PATH)?;
     loop {
-        let (stream, _) = listener.accept().await?;
-        tokio::spawn(handle_hook_connection(
-            stream,
-            state.clone(),
-            pending.clone(),
-            change_tx.clone(),
-        ));
+        match listener.accept().await {
+            Ok((stream, _)) => {
+                tokio::spawn(handle_hook_connection(
+                    stream,
+                    state.clone(),
+                    pending.clone(),
+                    change_tx.clone(),
+                ));
+            }
+            Err(e) => {
+                eprintln!("[claude-dash daemon] hook accept error: {}", e);
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        }
     }
 }
 
@@ -424,14 +436,21 @@ async fn handle_hook_connection(
 async fn serve_tui(state: SharedState, pending: PendingMap, change_tx: ChangeTx) -> Result<()> {
     let listener = UnixListener::bind(TUI_SOCKET_PATH)?;
     loop {
-        let (stream, _) = listener.accept().await?;
-        let change_rx = change_tx.subscribe();
-        tokio::spawn(handle_tui_connection(
-            stream,
-            state.clone(),
-            pending.clone(),
-            change_rx,
-        ));
+        match listener.accept().await {
+            Ok((stream, _)) => {
+                let change_rx = change_tx.subscribe();
+                tokio::spawn(handle_tui_connection(
+                    stream,
+                    state.clone(),
+                    pending.clone(),
+                    change_rx,
+                ));
+            }
+            Err(e) => {
+                eprintln!("[claude-dash daemon] tui accept error: {}", e);
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        }
     }
 }
 
