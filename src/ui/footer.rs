@@ -37,7 +37,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
 
     if has_sessions && !app.show_rename {
-        left_spans.extend([Span::styled("[e]", key), Span::styled(" rename  ", dim)]);
+        left_spans.extend([
+            Span::styled("[⏎]", key),
+            Span::styled(" focus  ", dim),
+            Span::styled("[e]", key),
+            Span::styled(" rename  ", dim),
+        ]);
     }
 
     if !app.show_new_session {

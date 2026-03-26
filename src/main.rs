@@ -116,7 +116,7 @@ async fn run_tui(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Resul
 
     let mut app = App::new(daemon_cmd_tx, usage_refresh_tx);
     let mut reader = EventStream::new();
-    let mut refresh_tick = tokio::time::interval(Duration::from_millis(200));
+    let mut refresh_tick = tokio::time::interval(Duration::from_millis(60));
     refresh_tick.tick().await;
 
     terminal.draw(|f| ui::render(f, &app))?;

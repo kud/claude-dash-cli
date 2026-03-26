@@ -97,6 +97,7 @@ pub struct App {
     pub show_rename: bool,
     pub rename_input: String,
     pub sort_mode: SortMode,
+    pub status_changed_at: HashMap<String, std::time::Instant>,
 
     daemon_cmd_tx: mpsc::UnboundedSender<DaemonCommand>,
     usage_refresh_tx: mpsc::UnboundedSender<()>,
@@ -132,6 +133,7 @@ impl App {
             show_rename: false,
             rename_input: String::new(),
             sort_mode: SortMode::Recent,
+            status_changed_at: HashMap::new(),
             daemon_cmd_tx,
             usage_refresh_tx,
         }
@@ -222,6 +224,14 @@ impl App {
                 session.status = crate::types::SessionStatus::WaitingForApproval;
             }
         }
+        let now = std::time::Instant::now();
+        for s in &sessions {
+            let old_status = self.sessions.iter().find(|o| o.session_id == s.session_id).map(|o| &o.status);
+            if old_status.map(|o| o != &s.status).unwrap_or(true) {
+                self.status_changed_at.insert(s.session_id.clone(), now);
+            }
+        }
+
         self.sort_sessions(&mut sessions);
         self.sessions = sessions;
         self.pending_permissions = perms;
@@ -302,6 +312,9 @@ impl App {
                         self.selected_index = self.clamped_index();
                     }
                 }
+            }
+            KeyCode::Enter => {
+                self.focus_session();
             }
             KeyCode::Delete | KeyCode::Backspace => {
                 if let Some(session) = self.selected_session() {
@@ -384,6 +397,7 @@ impl App {
             self.show_new_session = false;
             self.new_session_launched = false;
         }
+        self.status_changed_at.retain(|_, t| t.elapsed().as_millis() < 1000);
     }
 
     pub fn select_prev_pub(&mut self) { self.select_prev(); }
@@ -431,6 +445,19 @@ impl App {
         });
     }
 
+    fn focus_session(&self) {
+        let Some(session) = self.selected_session() else { return };
+        let cwd = session.cwd.clone();
+        let pid = session.pid;
+        std::thread::spawn(move || {
+            if std::env::var("TMUX").is_ok() {
+                focus_tmux(&cwd);
+            } else {
+                focus_macos(pid);
+            }
+        });
+    }
+
     fn quit_and_kill(&self) {
         if let Ok(raw) = std::fs::read_to_string("/tmp/claude-dash.pid") {
             if let Ok(pid) = raw.trim().parse::<i32>() {
@@ -453,6 +480,90 @@ impl App {
         }
         result
     }
+}
+
+fn focus_tmux(cwd: &str) {
+    let Ok(out) = std::process::Command::new("tmux")
+        .args(["list-panes", "-a", "-F", "#{session_name}:#{window_index}|#{pane_current_path}"])
+        .output()
+    else {
+        return;
+    };
+    for line in String::from_utf8_lossy(&out.stdout).lines() {
+        let Some((target, path)) = line.split_once('|') else { continue };
+        if path == cwd {
+            let _ = std::process::Command::new("tmux")
+                .args(["switch-client", "-t", target])
+                .status();
+            return;
+        }
+    }
+}
+
+fn focus_macos(pid: i64) {
+    let in_iterm = std::env::var("TERM_PROGRAM").ok().as_deref() == Some("iTerm.app")
+        || std::env::var("ITERM_SESSION_ID").is_ok();
+
+    if in_iterm {
+        let Some(tty) = find_tty_for_pid(pid) else { return };
+        let escaped = tty.replace('"', "\\\"");
+        let script = format!(
+            r#"tell application "iTerm2"
+  repeat with w in windows
+    repeat with t in tabs of w
+      repeat with s in sessions of t
+        if (tty of s) is "{escaped}" then
+          select w
+          tell w to select t
+          activate
+          return
+        end if
+      end repeat
+    end repeat
+  end repeat
+end tell"#
+        );
+        let _ = std::process::Command::new("osascript").args(["-e", &script]).spawn();
+    } else {
+        let _ = std::process::Command::new("osascript")
+            .args(["-e", r#"tell application "Terminal" to activate"#])
+            .spawn();
+    }
+}
+
+fn find_tty_for_pid(pid: i64) -> Option<String> {
+    std::iter::once(pid)
+        .chain(process_ancestors(pid))
+        .find_map(tty_for_pid)
+}
+
+fn tty_for_pid(pid: i64) -> Option<String> {
+    let out = std::process::Command::new("ps")
+        .args(["-p", &pid.to_string(), "-o", "tty="])
+        .output()
+        .ok()?;
+    let raw = String::from_utf8(out.stdout).ok()?;
+    let tty = raw.trim();
+    if tty.is_empty() || tty == "??" {
+        return None;
+    }
+    Some(format!("/dev/{tty}"))
+}
+
+fn process_ancestors(pid: i64) -> impl Iterator<Item = i64> {
+    let mut current = pid;
+    std::iter::from_fn(move || {
+        let out = std::process::Command::new("ps")
+            .args(["-p", &current.to_string(), "-o", "ppid="])
+            .output()
+            .ok()?;
+        let ppid: i64 = String::from_utf8(out.stdout).ok()?.trim().parse().ok()?;
+        if ppid <= 1 {
+            return None;
+        }
+        current = ppid;
+        Some(ppid)
+    })
 }
 
 pub fn hooks_installed() -> bool {

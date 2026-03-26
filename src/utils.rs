@@ -80,7 +80,7 @@ pub fn fmt_delta(now: f64, prev: f64) -> String {
 
 pub fn thinking_spinner(tick: u64) -> &'static str {
     const FRAMES: [&str; 8] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"];
-    FRAMES[(tick as usize) % FRAMES.len()]
+    FRAMES[(tick as usize / 3) % FRAMES.len()]
 }
 
 pub fn tool_summary(tool_name: &str, tool_input: &serde_json::Value) -> String {

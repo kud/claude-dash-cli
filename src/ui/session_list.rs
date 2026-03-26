@@ -109,6 +109,13 @@ fn render_list(frame: &mut Frame, area: Rect, app: &App) {
         .position(|s| matches!(s, Slot::Session(i) if *i == selected))
         .unwrap_or(0);
 
+    let heights: Vec<usize> = slots.iter().map(|s| match s {
+        Slot::Session(_) => 2,
+        _ => 1,
+    }).collect();
+
+    let available = area.height as usize;
+    let offset = compute_offset_lines(app.list_offset, visual_selected, &heights, available);
 
     let items: Vec<ListItem> = slots
         .iter()
@@ -122,14 +129,23 @@ fn render_list(frame: &mut Frame, area: Rect, app: &App) {
                     .iter()
                     .any(|p| p.session_id == session.session_id);
                 let display_name = app.session_display_name(&session.session_id).to_string();
-                session_item(session, *i == selected, has_pending, display_name, app.tick_count, area.width as usize)
+                let transition_age_ms = app.status_changed_at
+                    .get(&session.session_id)
+                    .map(|t| t.elapsed().as_millis());
+                session_item(session, *i == selected, has_pending, display_name, app.tick_count, area.width as usize, transition_age_ms)
             }
         })
         .collect();
 
-    let visible_count = area.height as usize;
-    let offset = compute_offset(app.list_offset, visual_selected, items.len(), visible_count);
-    let visible: Vec<ListItem> = items.into_iter().skip(offset).take(visible_count).collect();
+    let mut lines_left = available;
+    let visible: Vec<ListItem> = items.into_iter()
+        .zip(heights.iter())
+        .skip(offset)
+        .take_while(|(_, &h)| {
+            if lines_left >= h { lines_left -= h; true } else { false }
+        })
+        .map(|(item, _)| item)
+        .collect();
 
     frame.render_widget(List::new(visible), area);
 }
@@ -149,21 +165,23 @@ fn section_header_item(label: &'static str, color: Color, width: usize) -> ListI
     ]))
 }
 
-fn compute_offset(current_offset: usize, selected: usize, total: usize, visible: usize) -> usize {
-    if total == 0 || visible == 0 {
+fn compute_offset_lines(current_offset: usize, selected: usize, heights: &[usize], visible_lines: usize) -> usize {
+    if heights.is_empty() || visible_lines == 0 {
         return 0;
     }
-    let mut offset = current_offset;
-    if selected < offset {
-        offset = selected;
+    // Scroll up: selected moved above the current offset.
+    let mut offset = current_offset.min(selected);
+    // Scroll down: advance offset until the selected item fits within the visible window.
+    loop {
+        if offset >= selected { break; }
+        let window: usize = heights[offset..=selected].iter().sum();
+        if window <= visible_lines { break; }
+        offset += 1;
     }
-    if selected >= offset + visible {
-        offset = selected.saturating_sub(visible - 1);
-    }
-    offset.min(total.saturating_sub(visible))
+    offset
 }
 
-fn session_item(session: &SessionState, selected: bool, has_pending_permission: bool, display_name: String, tick: u64, area_width: usize) -> ListItem<'_> {
+fn session_item(session: &SessionState, selected: bool, has_pending_permission: bool, display_name: String, tick: u64, area_width: usize, transition_age_ms: Option<u128>) -> ListItem<'_> {
     let elapsed = format_duration(now_ms() - session.started_at);
     // Reserve space for cursor(2) + icon(2) + name(8) + spaces + status(12) + elapsed(8)
     let cwd_max = area_width.saturating_sub(display_name.len() + 36).max(20);
@@ -221,7 +239,14 @@ fn session_item(session: &SessionState, selected: bool, has_pending_permission: 
             Some((trunc_mid(&label, label_max), Color::Yellow))
         }
         SessionStatus::Processing | SessionStatus::Compacting => {
-            Some((format!("{} thinking…", thinking_spinner(tick)), Color::DarkGray))
+            let context = session.tool_history.last().map(|e| {
+                tool_summary(&e.tool_name, &e.tool_input)
+            });
+            let label = match context {
+                Some(ctx) => format!("{} {}", thinking_spinner(tick), trunc_mid(&ctx, label_max.saturating_sub(2))),
+                None => format!("{} thinking…", thinking_spinner(tick)),
+            };
+            Some((label, Color::DarkGray))
         }
         SessionStatus::WaitingForInput => {
             let notification = session.last_notification.as_deref().and_then(|n| {
@@ -233,17 +258,47 @@ fn session_item(session: &SessionState, selected: bool, has_pending_permission: 
         SessionStatus::Ended => Some(("session ended".to_string(), Color::DarkGray)),
     };
 
-    if let Some((label, color)) = tool_label {
-        lines.push(Line::from(vec![
-            Span::raw("     "),
-            Span::styled(label, Style::default().fg(color)),
-        ]));
-    }
+    let (second_text, second_color) = tool_label.unwrap_or_else(|| {
+        let phrase_color = if selected { Color::Rgb(90, 82, 105) } else { Color::Rgb(55, 52, 60) };
+        (idle_phrase(&session.session_id).to_string(), phrase_color)
+    });
+    lines.push(Line::from(vec![
+        Span::raw("     "),
+        Span::styled(second_text, Style::default().fg(second_color)),
+    ]));
 
     let item = ListItem::new(lines);
-    if selected {
-        item.style(Style::default().bg(Color::Rgb(30, 35, 50)))
+    let bg = if selected {
+        Some(Color::Rgb(30, 35, 50))
     } else {
-        item
+        transition_age_ms.and_then(|ms| match ms {
+            0..=149   => Some(Color::Rgb(60, 45, 15)),
+            150..=349 => Some(Color::Rgb(38, 28, 10)),
+            350..=599 => Some(Color::Rgb(22, 16, 5)),
+            _         => None,
+        })
+    };
+    match bg {
+        Some(c) => item.style(Style::default().bg(c)),
+        None => item,
     }
+}
+
+fn idle_phrase(session_id: &str) -> &'static str {
+    const PHRASES: &[&str] = &[
+        "watching the sky",
+        "counting clouds",
+        "listening to the wind",
+        "still waters",
+        "in the quiet",
+        "taking a breath",
+        "at rest",
+        "daydreaming",
+        "nothing to report",
+        "all quiet here",
+        "waiting for something interesting",
+        "enjoying the silence",
+    ];
+    let idx = session_id.bytes().fold(0usize, |a, b| a.wrapping_add(b as usize));
+    PHRASES[idx % PHRASES.len()]
 }
