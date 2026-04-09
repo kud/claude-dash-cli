@@ -40,7 +40,7 @@ fn release(bump_kind: &str) -> Result<()> {
 
     println!("\n  version  {} → {}", current, next);
     println!("  tag      v{}", next);
-    println!("  steps    bump → commit → tag → publish → push\n");
+    println!("  steps    bump → commit → tag → push (GitHub Actions publishes to crates.io)\n");
     confirm("Proceed?")?;
 
     doc["package"]["version"] = toml_edit::value(next.clone());
@@ -50,7 +50,6 @@ fn release(bump_kind: &str) -> Result<()> {
     run("git", &["add", "Cargo.toml", "Cargo.lock"])?;
     run("git", &["commit", "-m", &format!("chore: bump version to {next}")])?;
     run("git", &["tag", &format!("v{next}")])?;
-    run("cargo", &["publish"])?;
     run("git", &["push"])?;
     run("git", &["push", "--tags"])?;
 

@@ -93,6 +93,7 @@ pub struct SessionState {
     pub cwd: String,
     pub transcript_path: String,
     pub pid: i64,
+    pub iterm_session_id: Option<String>,
     pub started_at: i64,
     pub last_event_at: i64,
     pub current_tool: Option<String>,

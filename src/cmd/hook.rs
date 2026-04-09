@@ -36,6 +36,8 @@ struct HookEvent {
     pid: u32,
     ts: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
+    iterm_session_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     tool_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_input: Option<serde_json::Value>,
@@ -98,6 +100,9 @@ pub async fn run() -> Result<()> {
     let Some(hook_event_name) = raw.hook_event_name else { return Ok(()) };
 
     let ppid = unsafe { libc::getppid() } as u32;
+    let iterm_session_id = std::env::var("ITERM_SESSION_ID")
+        .ok()
+        .and_then(|s| s.split(':').nth(1).map(|u| u.to_string()));
     let cwd = if raw.cwd.is_empty() {
         std::env::current_dir()
             .map(|p| p.to_string_lossy().to_string())
@@ -114,6 +119,7 @@ pub async fn run() -> Result<()> {
         hook_event_name: hook_event_name.clone(),
         pid: ppid,
         ts: now_ms(),
+        iterm_session_id,
         tool_name: raw.tool_name,
         tool_input: raw.tool_input,
         tool_output: raw.tool_output,
@@ -125,7 +131,11 @@ pub async fn run() -> Result<()> {
 
     if hook_event_name == "PermissionRequest" {
         let decision = send_permission_request(&event).await;
-        let behavior = if decision == "deny" { "deny" } else { "allow" };
+        let behavior = match decision.as_str() {
+            "allow" => "allow",
+            "deny" => "deny",
+            _ => return Ok(()), // daemon not running or timed out — let Claude ask the user
+        };
         let output = HookOutput {
             hook_specific_output: HookSpecificOutput {
                 hook_event_name: "PermissionRequest",

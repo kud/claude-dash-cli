@@ -46,6 +46,8 @@ struct HookEventRaw {
     pid: i64,
     #[serde(default)]
     ts: i64,
+    #[serde(default)]
+    iterm_session_id: Option<String>,
     // Assigned by daemon for PermissionRequest connections
     #[serde(default)]
     connection_id: Option<String>,
@@ -93,6 +95,7 @@ struct SessionState {
     cwd: String,
     transcript_path: String,
     pid: i64,
+    iterm_session_id: Option<String>,
     started_at: i64,
     last_event_at: i64,
     current_tool: Option<String>,
@@ -187,6 +190,7 @@ fn get_or_create(state: &DaemonState, event: &HookEventRaw) -> SessionState {
         cwd: event.cwd.clone(),
         transcript_path: event.transcript_path.clone(),
         pid: event.pid,
+        iterm_session_id: event.iterm_session_id.clone(),
         started_at: event.ts,
         last_event_at: event.ts,
         current_tool: None,
@@ -211,6 +215,9 @@ fn apply_event(state: &mut DaemonState, event: &HookEventRaw) {
             s.cwd = event.cwd.clone();
             s.transcript_path = event.transcript_path.clone();
             s.pid = event.pid;
+            if event.iterm_session_id.is_some() {
+                s.iterm_session_id = event.iterm_session_id.clone();
+            }
             s.status = SessionStatus::WaitingForInput;
             s.last_event_at = ts;
             upsert(state, s);

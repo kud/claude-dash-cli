@@ -98,6 +98,7 @@ pub struct App {
     pub rename_input: String,
     pub sort_mode: SortMode,
     pub status_changed_at: HashMap<String, std::time::Instant>,
+    dismissed_sessions: HashSet<String>,
 
     daemon_cmd_tx: mpsc::UnboundedSender<DaemonCommand>,
     usage_refresh_tx: mpsc::UnboundedSender<()>,
@@ -134,6 +135,7 @@ impl App {
             rename_input: String::new(),
             sort_mode: SortMode::Recent,
             status_changed_at: HashMap::new(),
+            dismissed_sessions: HashSet::new(),
             daemon_cmd_tx,
             usage_refresh_tx,
         }
@@ -224,6 +226,9 @@ impl App {
                 session.status = crate::types::SessionStatus::WaitingForApproval;
             }
         }
+        sessions.retain(|s| !self.dismissed_sessions.contains(&s.session_id));
+        let perms: Vec<_> = perms.into_iter().filter(|p| !self.dismissed_sessions.contains(&p.session_id)).collect();
+
         let now = std::time::Instant::now();
         for s in &sessions {
             let old_status = self.sessions.iter().find(|o| o.session_id == s.session_id).map(|o| &o.status);
@@ -231,6 +236,8 @@ impl App {
                 self.status_changed_at.insert(s.session_id.clone(), now);
             }
         }
+        let live_ids: std::collections::HashSet<&str> = sessions.iter().map(|s| s.session_id.as_str()).collect();
+        self.status_changed_at.retain(|id, _| live_ids.contains(id.as_str()));
 
         self.sort_sessions(&mut sessions);
         self.sessions = sessions;
@@ -319,6 +326,7 @@ impl App {
             KeyCode::Delete | KeyCode::Backspace => {
                 if let Some(session) = self.selected_session() {
                     let id = session.session_id.clone();
+                    self.dismissed_sessions.insert(id.clone());
                     self.sessions.retain(|s| s.session_id != id);
                     self.selected_index = self.clamped_index();
                 }
@@ -449,11 +457,12 @@ impl App {
         let Some(session) = self.selected_session() else { return };
         let cwd = session.cwd.clone();
         let pid = session.pid;
+        let iterm_session_id = session.iterm_session_id.clone();
         std::thread::spawn(move || {
             if std::env::var("TMUX").is_ok() {
                 focus_tmux(&cwd);
             } else {
-                focus_macos(pid);
+                focus_macos(pid, iterm_session_id);
             }
         });
     }
@@ -500,11 +509,19 @@ fn focus_tmux(cwd: &str) {
     }
 }
 
-fn focus_macos(pid: i64) {
+fn focus_macos(pid: i64, iterm_session_id: Option<String>) {
     let in_iterm = std::env::var("TERM_PROGRAM").ok().as_deref() == Some("iTerm.app")
         || std::env::var("ITERM_SESSION_ID").is_ok();
 
     if in_iterm {
+        if let Some(uuid) = iterm_session_id {
+            let it2api = "/Applications/iTerm.app/Contents/Resources/utilities/it2api";
+            let _ = std::process::Command::new(it2api)
+                .args(["activate", "session", &uuid])
+                .output();
+            let _ = std::process::Command::new(it2api).args(["activate-app"]).spawn();
+            return;
+        }
         let Some(tty) = find_tty_for_pid(pid) else { return };
         let escaped = tty.replace('"', "\\\"");
         let script = format!(
