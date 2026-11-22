@@ -2,8 +2,6 @@
 
 <img src="assets/icon.svg" width="128" alt="Claude Dash icon" />
 
-📊
-
 # Claude Dash
 
 ![Rust](https://img.shields.io/badge/Rust-000000?style=flat-square&logo=rust&logoColor=white)
