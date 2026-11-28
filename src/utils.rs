@@ -107,3 +107,76 @@ pub fn tool_summary(tool_name: &str, tool_input: &serde_json::Value) -> String {
         Some(h) => format!("{}: {}", tool_name, trunc_mid(&abbreviate_home(h), 48)),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn format_duration_picks_largest_unit() {
+        assert_eq!(format_duration(0), "0s");
+        assert_eq!(format_duration(-5_000), "0s");
+        assert_eq!(format_duration(45_000), "45s");
+        assert_eq!(format_duration(125_000), "2m 5s");
+        assert_eq!(format_duration(3_723_000), "1h 2m");
+    }
+
+    #[test]
+    fn trunc_mid_keeps_short_strings_and_elides_long_ones() {
+        assert_eq!(trunc_mid("short", 10), "short");
+        let out = trunc_mid("abcdefghijklmnopqrstuvwxyz", 12);
+        assert_eq!(out.chars().count(), 12);
+        assert_eq!(out, "abcde...wxyz");
+    }
+
+    #[test]
+    fn trunc_mid_is_char_safe() {
+        let out = trunc_mid("ééééééééééééééééééé", 9);
+        assert_eq!(out.chars().count(), 9);
+        assert!(out.contains("..."));
+    }
+
+    #[test]
+    fn progress_bar_clamps_and_fills() {
+        assert_eq!(progress_bar(0.0, 4), "○○○○");
+        assert_eq!(progress_bar(50.0, 4), "●●○○");
+        assert_eq!(progress_bar(150.0, 4), "●●●●");
+        assert_eq!(progress_bar(-10.0, 4), "○○○○");
+    }
+
+    #[test]
+    fn cost_and_token_formatting() {
+        assert_eq!(fmt_cost(1.234), "$1.23");
+        assert_eq!(fmt_tokens(999), "999 tok");
+        assert_eq!(fmt_tokens(12_345), "12k tok");
+        assert_eq!(fmt_tokens(2_500_000), "2.50M tok");
+    }
+
+    #[test]
+    fn delta_formatting() {
+        assert_eq!(fmt_delta(15.0, 10.0), "+$5.00 (+50.0%)");
+        assert_eq!(fmt_delta(5.0, 10.0), "$-5.00 (-50.0%)");
+        assert_eq!(fmt_delta(3.0, 0.0), "+$3.00 (+—%)");
+    }
+
+    #[test]
+    fn spinner_cycles_through_frames() {
+        assert_eq!(thinking_spinner(0), thinking_spinner(2));
+        assert_ne!(thinking_spinner(0), thinking_spinner(3));
+        assert_eq!(thinking_spinner(0), thinking_spinner(24));
+    }
+
+    #[test]
+    fn tool_summary_prefers_file_path_then_command() {
+        assert_eq!(tool_summary("Read", &json!({})), "Read");
+        assert_eq!(
+            tool_summary("Bash", &json!({"command": "ls -la"})),
+            "Bash: ls -la"
+        );
+        assert_eq!(
+            tool_summary("Edit", &json!({"file_path": "/x/y.rs", "command": "ignored"})),
+            "Edit: /x/y.rs"
+        );
+    }
+}
