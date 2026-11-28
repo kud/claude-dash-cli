@@ -303,3 +303,57 @@ fn parse_model_breakdowns(v: Option<&serde_json::Value>) -> Vec<ModelBreakdown> 
         })
         .unwrap_or_default()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn parse_iso_ms_handles_epoch_and_known_dates() {
+        assert_eq!(parse_iso_ms("1970-01-01T00:00:00Z"), Some(0));
+        assert_eq!(parse_iso_ms("2000-03-01T00:00:00Z"), Some(951_868_800_000));
+        assert_eq!(parse_iso_ms("2024-02-29T12:34:56Z"), Some(1_709_210_096_000));
+        assert_eq!(parse_iso_ms("too short"), None);
+        assert_eq!(parse_iso_ms("abcd-ef-ghTij:kl:mn"), None);
+    }
+
+    #[test]
+    fn format_resets_at_in_the_past_is_now() {
+        assert_eq!(format_resets_at("1970-01-01T00:00:00Z"), "now");
+    }
+
+    #[test]
+    fn normalize_monthly_takes_last_entry() {
+        let raw = json!({"monthly": [
+            {"month": "2026-10", "totalCost": 1.0},
+            {"month": "2026-11", "totalCost": 2.5, "totalTokens": 42,
+             "modelBreakdowns": [{"modelName": "m", "totalTokens": 40, "totalCost": 2.0}]}
+        ]});
+        let m = normalize_monthly(&raw).expect("monthly");
+        assert_eq!(m.month, "2026-11");
+        assert_eq!(m.total_cost, 2.5);
+        assert_eq!(m.total_tokens, 42);
+        assert_eq!(m.model_breakdowns.len(), 1);
+        assert_eq!(m.model_breakdowns[0].model_name, "m");
+        assert!(normalize_monthly(&json!({})).is_none());
+    }
+
+    #[test]
+    fn normalize_total_counts_daily_sessions() {
+        let raw = json!({"totals": {"totalCost": 9.0, "totalTokens": 7}, "daily": [{}, {}, {}]});
+        let t = normalize_total(&raw).expect("totals");
+        assert_eq!(t.total_cost, 9.0);
+        assert_eq!(t.total_tokens, 7);
+        assert_eq!(t.sessions, 3);
+        assert!(normalize_total(&json!({})).is_none());
+    }
+
+    #[test]
+    fn parse_daily_entry_requires_cost() {
+        assert!(parse_daily_entry(&json!({"date": "2026-11-27"})).is_none());
+        let d = parse_daily_entry(&json!({"totalCost": 0.5, "date": "2026-11-27"})).unwrap();
+        assert_eq!(d.cost, 0.5);
+        assert_eq!(d.date, "2026-11-27");
+    }
+}
